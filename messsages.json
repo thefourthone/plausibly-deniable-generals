@@ -1,0 +1,29 @@
+{
+  "meta":{
+    "normal":{
+      "login":1,
+      "enterRoom":2,
+      "ping":3,
+      "info":4
+    },
+    "error":{
+      "badMessage":8,
+      "badUser":9,
+      "badConnection":10
+    }
+  },
+  "game":{
+    "normal":{
+      "updateCell":1,
+      "move":2,
+      "status":3,
+      "replay":4,
+      "map":
+    },
+    "error":{
+      "missingData":8,
+      "cheating":9,
+      "internal":13,
+    }
+  }
+}
