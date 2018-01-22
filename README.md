@@ -26,3 +26,22 @@ So the goals of this project are to (roughly in order):
 ## Protocol
 
 Because this is project really needs competeing clients to reach maximum potential, the protocol for interacting with the server is going to be fully documented, but I haven't finalized it yet.
+
+### In progress protocol
+
+All communication to the game server will be through websockets. All text messages will be broadcast to the current room with a prepended username + ": ". The first byte of every binary message describes the type of message; the rest of the message should be parsed according to that messages rules. 
+
+The first byte is further separated into the first nibble being metadata and the second nibble being an arbitrary message type field.
+So in binary the first byte would be separated into 5 areas `abcdeeee`,
+
+|Label|Description|Values|
+|-----|-----------|------|
+|a|Direction of travel | 1 = server -> client, 0 client -> server|
+|b|Which server needs to handle the message | 1 = meta server, 0 = game server|
+|c|Info/Status message | 1 = Doesn't change internal state 0 = Changes internal state|
+|d|Error| 1=there was an error, 0 = no error|
+|e|Additional arbitrary data to separate different message types | 0xA |
+
+
+
+
