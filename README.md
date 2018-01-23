@@ -2,7 +2,7 @@
 
 This project is the intersection of [Plausible Deniability](https://github.com/ad510/plausible-deniability) and [generals.io](https://generals.io). The basic idea is to create a way for custom clients to "cheat" in a fair and controlled way in a game very similar to generals.
 
-The way it does this is by only having clients show the neccessary information for interacting with other players to tghe server and then upon finishing the game reveal the moves they played. Changing the moves they played midgame is totally acceptable, but there has to be a normal rule-following replay that matches the given midgame information.
+The way it does this is by only having clients show the neccessary information for interacting with other players to the server and then upon finishing the game reveal the moves they played. Changing the moves they played midgame is totally acceptable, but there has to be a normal rule-following replay that matches the given midgame information.
 
 ## How do I play this?
 
@@ -40,8 +40,22 @@ So in binary the first byte would be separated into 5 areas `abcdeeee`,
 |b|Which server needs to handle the message | 1 = meta server, 0 = game server|
 |c|Info/Status message | 1 = Doesn't change internal state 0 = Changes internal state|
 |d|Error| 1=there was an error, 0 = no error|
-|e|Additional arbitrary data to separate different message types | 0xA |
+|e|Additional arbitrary data to separate different message types | See messages.json|
 
+Before the more specific parsing of the different messages some sub-parts need to be covered.
 
+|Name of sub-part | Description | How to parse | Example | 
+|-----------------|-------------|--------------|---------|
+|Bounded size (unsigned) integers| Integers that can't grow infinitely (or quite large)| 2's complement (or raw) integers with a specified number of bytes.|0xFFFF (2 byte unsigned) -> 65535|
+|Unbounded unsigned integers|Numbers like the number of soldiers in a cell (can potentnially grow infinitely, but generally small)| Parse as an unsigned number and if it is the parse a bounded integer => a, then another of this type => b and the result is a+(b*(maximum bounded + 1))|0xFF0ABB (1 byte) -> 0xBB0A<br> 0xFF0AFFBBCC (1 byte) -> 0xCCBB0A<br> 0xF9 (1 byte) -> 0xF9|   
+|String|ASCII text|(2 byte unsigned integer) as length then that number of bytes interpretted as ASCII text (perhaps going to UTF-8 at some point)| 0x000548656c6c6f -> "Hello"|
+|Point (Or positive difference between two points)|Location on a board (with a already known width)|Parse unbounded int then use the remainder from dividing by the width to give the X coordinate and the the rounded down ratio be the Y coordinate.| 0xF0 (on a 7 wide board) -> (2,1)|
 
+Notation: The parsing section following will use (u)int, unbound, string, and point to represent the respective types of data. the number at the end of type is how many bits the underlying (u)int is. Commas mean to parse the left, then the right.
 
+| Name of type | Description | When used | How to parse |
+|--------------|-------------|-----------|--------------|
+| updateCells | Used to share knowledge of the current board state. | Each turn each player must send all of the cells they own that might be seen by another player; the server sends neccessary updates to the client to show other players movements | uint8 player, point8 firstLocation, unbound8 value, (point8 diffFromLast, unbound8 val) for each cell| 
+| move | Make a move into unoccupied or enemy territory | Client -> Server only, when another player makes a move that will be seen in the updateCells message. | point8 location, uint8 direction, unbound8 units |
+| status | Used to update clocks, land owned, etc | Server -> Client only, once every turn | (uint16 time, unbound troops) for each player|
+| replay | A list of moves | Used at the end to validate no cheating | uint8 player, (unbound8 numberOfSkips, point8 location, uint8 direction, unbound8 units) for each period of activity |
