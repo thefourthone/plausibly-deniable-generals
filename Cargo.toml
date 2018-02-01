@@ -1,0 +1,11 @@
+[package]
+name = "plausibily-deniable-generals"
+version = "0.1.0"
+authors = ["Benjamin Landers <benjaminrlanders@gmail.com>"]
+
+[lib]
+name = "messages"
+path = "src/messages.rs"
+
+[dependencies]
+ws = "*"
