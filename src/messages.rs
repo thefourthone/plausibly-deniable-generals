@@ -14,7 +14,7 @@ pub enum GameMessage {
 }
 
 #[derive(Debug)]
-enum MetaMessage {
+pub enum MetaMessage {
     Error(String, MessageType),
     Chat(String),
     EnterRoom(String),
@@ -23,9 +23,15 @@ enum MetaMessage {
     Ping,
 }
 
+#[derive(Debug)]
+pub enum Message {
+    Game(GameMessage),
+    Meta(MetaMessage),
+}
+
 // First byte datatypes
 #[derive(Debug)]
-enum MessageType {
+pub enum MessageType {
     Login,
     EnterRoom,
     Ping,
@@ -83,7 +89,7 @@ fn meta_from_byte(first: u8) -> MetaData {
 }
 
 // Low level parsing primitives
-pub fn parse_unbounded<I>(it: &mut I) -> Option<u32>
+fn parse_unbounded<I>(it: &mut I) -> Option<u32>
 where
     I: Iterator<Item = u8>,
 {
@@ -101,7 +107,7 @@ where
     })
 }
 
-pub fn parse_point<I>(it: &mut I, width: u32) -> Option<Point>
+fn parse_point<I>(it: &mut I, width: u32) -> Option<Point>
 where
     I: Iterator<Item = u8>,
 {
@@ -127,7 +133,7 @@ where
 }
 
 // Parsing for full GameMessages of a particular type
-pub fn parse_update<I>(it: &mut I) -> Option<GameMessage>
+fn parse_update<I>(it: &mut I) -> Option<GameMessage>
 where
     I: Iterator<Item = u8>,
 {
@@ -148,7 +154,7 @@ where
     Some(GameMessage::Update(player, width, points, values))
 }
 
-pub fn parse_move<I>(it: &mut I) -> Option<GameMessage>
+fn parse_move<I>(it: &mut I) -> Option<GameMessage>
 where
     I: Iterator<Item = u8>,
 {
@@ -221,12 +227,13 @@ where
     })
 }
 
+#[derive(Debug)]
 pub struct Error {
     text: &'static str,
     code: MessageType,
 }
 
-pub fn handle_message(data: Vec<u8>) -> Result<(), Error> {
+pub fn parse_message(data: Vec<u8>) -> Result<Message, Error> {
     let mut it = data.into_iter();
     let first = it.next().unwrap_or(0);
     let meta = meta_from_byte(first);
@@ -236,7 +243,6 @@ pub fn handle_message(data: Vec<u8>) -> Result<(), Error> {
             code: MessageType::MalformedMessage,
         });
     }
-    println!("{:?},{:?}", meta, first);
     let msg_type = match parse_message_type(meta.clone(), first & 0xF) {
         Some(msg) => msg,
         None => {
@@ -246,24 +252,17 @@ pub fn handle_message(data: Vec<u8>) -> Result<(), Error> {
             })
         }
     };
-    println!("{:?}", msg_type);
-    if meta.meta {
-        let meta_message = match parse_meta_message(msg_type,&mut it){
+    Ok(if meta.meta {
+        Message::Meta(match parse_meta_message(msg_type,&mut it){
 		Some(msg)=>msg,
 		None => return Err(Error{text: "Malformed MetaMessage data: Failed to parse the data according to the message type",
 					 code: MessageType::MalformedMessage}),
-		};
-
-        println!("{:?}", meta_message);
+		})
     } else {
-        let game_message = match parse_game_message(msg_type, &mut it){
+        Message::Game(match parse_game_message(msg_type, &mut it){
 		Some(msg)=>msg,
 		None => return Err(Error{text: "Malformed GameMessage data: Failed to parse the data according to the message type",
 					 code: MessageType::MalformedMessage}),
-		
-		};
-        println!("{:?}", game_message);
-    }
-
-    Ok(())
+		})
+    })
 }
