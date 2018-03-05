@@ -1,8 +1,8 @@
 // Structs for low level parsing
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Move(Point, u8, u32);
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Point(u32, u32);
 
 // Full Messages
@@ -30,7 +30,7 @@ pub enum Message {
 }
 
 // First byte datatypes
-#[derive(Debug)]
+#[derive(Debug,PartialEq)]
 pub enum MessageType {
     Login,
     EnterRoom,
@@ -50,13 +50,14 @@ pub enum MessageType {
     Internal,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct MetaData {
     info: bool,
     error: bool,
     meta: bool,
     from_server: bool,
 }
+
 
 // Functions to marshal in between a byte and the first byte metadata
 fn parse_message_type(meta: MetaData, id: u8) -> Option<MessageType> {
@@ -88,6 +89,34 @@ fn meta_from_byte(first: u8) -> MetaData {
     }
 }
 
+#[test]
+fn first_byte_parsing(){
+  // Some basic checks for metadata parse
+  assert_eq!(meta_from_byte(0xFF),MetaData{
+    from_server:true,
+    meta:true,
+    info:true,
+    error: true}); 
+  
+ assert_eq!(meta_from_byte(0x0F),MetaData{
+    from_server:false,
+    meta:false,
+    info:false,
+    error:false}); 
+
+ assert_eq!(meta_from_byte(0x8F),MetaData{
+    from_server:true,
+    meta:false,
+    info:false,
+    error: false});
+
+ // Simple MessageType parsing
+ assert_eq!(parse_message_type(meta_from_byte(0x41),0x1),Some(MessageType::Login));
+ assert_eq!(parse_message_type(meta_from_byte(0x4F),0xF),None);
+ assert_eq!(parse_message_type(meta_from_byte(0x01),0x1),Some(MessageType::UpdateCell));
+ assert_eq!(parse_message_type(meta_from_byte(0x0F),0xF),None);
+}
+
 // Low level parsing primitives
 fn parse_unbounded<I>(it: &mut I) -> Option<u32>
 where
@@ -107,6 +136,20 @@ where
     })
 }
 
+#[test]
+fn test_parse_unbounded(){
+  assert_eq!(parse_unbounded(&mut vec![0].into_iter()), Some(0));
+  assert_eq!(parse_unbounded(&mut vec![4].into_iter()), Some(4));
+  assert_eq!(parse_unbounded(&mut vec![254].into_iter()), Some(254));
+  assert_eq!(parse_unbounded(&mut vec![255].into_iter()), None);
+  
+  assert_eq!(parse_unbounded(&mut vec![255,1,1].into_iter()), Some(257));
+  assert_eq!(parse_unbounded(&mut vec![255,91,1].into_iter()), Some(347));
+
+  // TODO: add some more third level parses
+}
+
+
 fn parse_point<I>(it: &mut I, width: u32) -> Option<Point>
 where
     I: Iterator<Item = u8>,
@@ -120,6 +163,19 @@ where
 {
     let num = parse_unbounded_private(first, it)?;
     Some(Point(num % width, num / width))
+}
+
+#[test]
+fn test_parse_point(){
+  assert_eq!(parse_point(&mut vec![0].into_iter(),6), Some(Point(0,0)));
+  assert_eq!(parse_point(&mut vec![1].into_iter(),6), Some(Point(1,0)));
+  assert_eq!(parse_point(&mut vec![6].into_iter(),6), Some(Point(0,1)));
+
+  assert_eq!(parse_point(&mut vec![255,0,1].into_iter(),256), Some(Point(0,1)));
+  assert_eq!(parse_point(&mut vec![255,1,1].into_iter(),256), Some(Point(1,1)));
+  assert_eq!(parse_point(&mut vec![255,0,255,0,1].into_iter(),256), Some(Point(0,256)));
+
+  // It would be good to test some more edge cases, but it looks like it works correctly
 }
 
 fn parse_move_private<I>(it: &mut I, width: u32) -> Option<Move>
